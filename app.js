@@ -3,7 +3,9 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const app = express();
-const md5 = require("md5");
+
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 //for a common string , verytime you generate hash it will be same
 const mongoose = require("mongoose");
 const ejs = require("ejs");
@@ -38,26 +40,32 @@ app.get("/login", function (req, res) {
 });
 
 app.post("/register", async function (req, res) {
-  const newUser = new User({
-    email: req.body.username,
-    password: md5(req.body.password),
-  });
+  bcrypt.hash(req.body.password, saltRounds, async function (err, hash) {
+    // Store hash in your password DB.
+    const newUser = new User({
+      email: req.body.username,
+      password: hash,
+    });
 
-  await newUser
-    .save()
-    .then(() => res.render("secrets"))
-    .catch((err) => console.log(err));
+    await newUser
+      .save()
+      .then(() => res.render("secrets"))
+      .catch((err) => console.log(err));
+  });
 });
 app.post("/login", async function (req, res) {
   const username = req.body.username;
-  const password = md5(req.body.password);
+  const password = req.body.password;
+
   await User.findOne({ email: username }).exec(function (err, foundUser) {
     if (err) {
       return handleError(err);
     } else if (foundUser) {
-      if (foundUser.password === password) {
-        res.render("secrets");
-      }
+      bcrypt.compare(password, foundUser.password, function (err, result) {
+        if (result == true) {
+          res.render("secrets");
+        }
+      });
     }
   });
 });
